@@ -1,0 +1,14 @@
+
+Project by Tomer Gresler
+
+This project was done as a final assignment in course 20937 defensive programming of the open university
+
+To make it short, this project is a messaging app where the server was written in python and client in c++.
+
+To run it you must have boost and crypto++(version used in the project is 8_8_0)
+
+Enjoy messing with it and reding through.
+
+The program starts from the main file.
+
+Run the python main first to start the server, then the c++ main to run the client.
