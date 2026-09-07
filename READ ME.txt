@@ -1,7 +1,7 @@
 
 Maman15 by Tomer Gresler
 
-This project was done as a final assignmet in course 20937 of the open university
+This project was done as a final assignment in course 20937 defensive programming of the open university
 
 To make it short, this project is a messaging app where the server was written in python and client in c++.
 
