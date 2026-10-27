@@ -35,5 +35,5 @@ jobs:
         run: vcpkg install cryptopp boost-asio --triplet x64-windows-static
       - name: Build client (Visual Studio)
         run: |
-          cmake -S client -B build -A x64 -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-static
+          cmake -S client -B build -A x64 -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-static -DCRYPTOPP_LIBRARY="$env:VCPKG_INSTALLATION_ROOT/installed/x64-windows-static/lib/cryptopp.lib"
           cmake --build build --config Release

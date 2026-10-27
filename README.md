@@ -57,7 +57,7 @@ cmake -S client -B build -A x64 -DBOOST_ROOT=C:/boost -DCRYPTOPP_HEADERS=C:/cryp
 cmake --build build --config Release
 ```
 
-You can also open the `build` folder's `.sln` file in Visual Studio. If you got Boost and Crypto++ from vcpkg instead, pass `-DCMAKE_TOOLCHAIN_FILE=<vcpkg>/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static`.
+You can also open the `build` folder's `.sln` file in Visual Studio. If you got Boost and Crypto++ from vcpkg instead, pass `-DCMAKE_TOOLCHAIN_FILE=<vcpkg>/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static -DCRYPTOPP_LIBRARY=<vcpkg>/installed/x64-windows-static/lib/cryptopp.lib` (the release library, otherwise CMake may pick the debug one).
 
 ## Running the client
 
