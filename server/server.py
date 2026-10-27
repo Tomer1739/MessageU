@@ -1,7 +1,6 @@
 import socket
 import selectors
 import uuid
-import time
 from datetime import datetime
 import protocol
 from database import Database
@@ -15,6 +14,7 @@ class Server:
     PACKET_SIZE = 1024
     MAX_QUEUED_CONN = 5
     IS_BLOCKING = False
+    TIMEOUT = 5  # seconds to wait for a slow client
 
     def __init__(self, host, port):
         self.host = host
@@ -36,43 +36,65 @@ class Server:
     def accept(self, sock, mask):
         """accept new connections"""
         conn, addr = sock.accept()
-        conn.setblocking(Server.IS_BLOCKING)
+        # blocking with a timeout, so a long request can be read fully without freezing the server forever
+        conn.settimeout(Server.TIMEOUT)
         self.sel.register(conn, selectors.EVENT_READ, self.read)
         print(f"New connection from {addr}")
 
     def read(self, conn, mask):
         """read data from client"""
         print("Client connected, reading data...")
-        data = conn.recv(Server.PACKET_SIZE)
-
-        if data:
+        try:
             request_header = protocol.RequestHeader()
-            success = False
+            data = b""
 
-            if not request_header.unpack(data):
-                print("Failed to parse request header")
-            else:
-                if request_header.code in self.request_handlers:
-                    response_data = self.request_handlers[request_header.code](conn, data)
-                    success = response_data and self.write(conn, response_data)
+            # read the full header first
+            while len(data) < request_header.SIZE:
+                chunk = conn.recv(request_header.SIZE - len(data))
+                if not chunk:
+                    break
+                data += chunk
+
+            # then read the full payload
+            if request_header.unpack(data):
+                request_size = request_header.SIZE + request_header.payloadSize
+                while len(data) < request_size:
+                    chunk = conn.recv(min(Server.PACKET_SIZE, request_size - len(data)))
+                    if not chunk:
+                        break
+                    data += chunk
+
+            if data:
+                success = False
+
+                if not request_header.unpack(data):
+                    print("Failed to parse request header")
                 else:
-                    print(f"Unknown request code: {request_header.code}")
+                    if request_header.code in self.request_handlers:
+                        response_data = self.request_handlers[request_header.code](conn, data)
+                        success = response_data and self.write(conn, response_data)
+                    else:
+                        print(f"Unknown request code: {request_header.code}")
 
-            # send error if handling failed
-            if not success:
-                error_response = protocol.ErrorResponse()
-                self.write(conn, error_response.pack())
+                # send error if handling failed
+                if not success:
+                    error_response = protocol.ErrorResponse()
+                    self.write(conn, error_response.pack())
 
-            # update client's last seen time
-            if request_header.clientID:
-                try:
-                    self.database.update_last_seen(request_header.clientID, str(datetime.now()))
-                except Exception as e:
-                    print(f"Failed to update last seen: {e}")
-
-        time.sleep(1)
-        self.sel.unregister(conn)
-        conn.close()
+                # update client's last seen time
+                if request_header.clientID:
+                    try:
+                        self.database.update_last_seen(request_header.clientID, str(datetime.now()))
+                    except Exception as e:
+                        print(f"Failed to update last seen: {e}")
+        except Exception as e:
+            # a bad request or a client reset should not stop the server
+            print(f"Error handling request: {e}")
+            error_response = protocol.ErrorResponse()
+            self.write(conn, error_response.pack())
+        finally:
+            self.sel.unregister(conn)
+            conn.close()
 
     def write(self, conn, data):
         """send data back to client"""
@@ -125,7 +147,11 @@ class Server:
                 events = self.sel.select()
                 for key, mask in events:
                     callback = key.data
-                    callback(key.fileobj, mask)
+                    try:
+                        callback(key.fileobj, mask)
+                    except Exception as e:
+                        # keep serving other clients
+                        print(f"Connection error: {e}")
         except KeyboardInterrupt:
             print("Server shutting down...")
         except Exception as e:
@@ -223,6 +249,11 @@ class Server:
             print("Failed to parse public key request")
             return None
 
+        # only registered clients can ask for keys
+        if not self.database.client_id_exists(request.header.clientID):
+            print(f"Client ID does not exist: {request.header.clientID.hex()}")
+            return None
+
         # get public key from db
         public_key = self.database.get_client_public_key(request.clientID)
         if not public_key:
@@ -261,10 +292,8 @@ class Server:
             response_data, message_ids = self.message_handler.handle_pending_messages(request_header.clientID)
 
             if response_data:
-                success = self.write(conn, response_data)
-
-                # remove messages that were delivered
-                if success and message_ids:
+                # read() sends the response, so remove the messages that are handed over
+                if message_ids:
                     self.message_handler.remove_delivered_messages(message_ids)
 
                 return response_data

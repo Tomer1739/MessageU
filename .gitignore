@@ -15,3 +15,7 @@ build/
 # IDEs
 .vscode/
 .idea/
+
+# MessageU data files
+*.db
+me.info

@@ -17,6 +17,11 @@ class MessageHandler:
             print("Failed to parse message send request")
             return False
 
+        # check sender exists
+        if not self.db.client_id_exists(request.header.clientID):
+            print(f"Sender client ID ({request.header.clientID.hex()}) does not exist")
+            return False
+
         # check target exists
         if not self.db.client_id_exists(request.toClientID):
             print(f"Target client ID ({request.toClientID.hex()}) does not exist")

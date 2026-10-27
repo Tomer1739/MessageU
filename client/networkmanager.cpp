@@ -1,7 +1,6 @@
 #include "networkmanager.h"
 #include <iostream>
-#include <thread>
-#include <chrono>
+#include <cstring>
 
 class NetworkManager::Impl {
 public:

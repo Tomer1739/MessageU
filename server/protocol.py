@@ -214,12 +214,9 @@ class MessageSendRequest:
 
             self.content = data[offset:offset + bytesRead]
 
-            # read more if needed
-            while bytesRead < self.contentSize:
-                chunk = conn.recv(1024)
-                chunkSize = min(len(chunk), self.contentSize - bytesRead)
-                self.content += chunk[:chunkSize]
-                bytesRead += chunkSize
+            # the server already read the whole payload, so the content must all be here
+            if bytesRead < self.contentSize:
+                raise ValueError("content is shorter than content size")
 
             return True
         except Exception:

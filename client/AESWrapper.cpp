@@ -5,13 +5,20 @@
 #include <cryptopp880/filters.h>
 
 #include <stdexcept>
+#include <cstring>
 #include <immintrin.h>	// _rdrand32_step
 
 
 unsigned char* AESWrapper::GenerateKey(unsigned char* buffer, unsigned int length)
 {
 	for (size_t i = 0; i < length; i += sizeof(unsigned int))
-		_rdrand32_step(reinterpret_cast<unsigned int*>(&buffer[i]));
+	{
+		unsigned int random = 0;
+		if (!_rdrand32_step(&random))
+			throw std::runtime_error("failed to generate random key");
+		// copy only what is left, so we never write past the buffer
+		memcpy(&buffer[i], &random, (length - i < sizeof(unsigned int)) ? length - i : sizeof(unsigned int));
+	}
 	return buffer;
 }
 
@@ -24,7 +31,7 @@ AESWrapper::AESWrapper(const unsigned char* key, unsigned int length)
 {
 	if (length != DEFAULT_KEYLENGTH)
 		throw std::length_error("key length must be 16 bytes");
-	memcpy_s(_key, DEFAULT_KEYLENGTH, key, length);
+	memcpy(_key, key, DEFAULT_KEYLENGTH);
 }
 
 AESWrapper::~AESWrapper()

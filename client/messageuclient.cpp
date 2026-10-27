@@ -5,6 +5,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <cstring>
 
 MessageUClient::MessageUClient()
     : m_serverPort(0), m_isRegistered(false), m_isRunning(false), m_rsaPrivate(nullptr) {
@@ -208,9 +209,8 @@ bool MessageUClient::loadClientInfo() {
 }
 
 bool MessageUClient::connectToServer() {
-    if (m_networkManager.isConnected()) {
-        return true;
-    }
+    // the server closes the connection after each response, so connect fresh for every request
+    m_networkManager.disconnect();
 
     return m_networkManager.connect(m_serverAddress, m_serverPort);
 }
@@ -227,7 +227,7 @@ bool MessageUClient::registerClient() {
 
     // check username is alphanumeric
     for (char c : username) {
-        if (!std::isalnum(c)) {
+        if (!std::isalnum(static_cast<unsigned char>(c))) {
             displayError("Username must be alphanumeric.");
             return false;
         }
@@ -303,6 +303,8 @@ bool MessageUClient::requestClientsList() {
         return false;
     }
 
+    // keep the old list so saved keys are not lost
+    std::map<std::string, Client> oldClients = m_clients;
     m_clients.clear();
 
     size_t offset = sizeof(Protocol::ResponseHeader);
@@ -326,6 +328,13 @@ bool MessageUClient::requestClientsList() {
 
         // add client to list
         m_clients[name] = Client(clientId, name);
+
+        // restore keys we already have for this client
+        auto oldClient = oldClients.find(name);
+        if (oldClient != oldClients.end() && oldClient->second.getID() == clientId) {
+            m_clients[name].setPublicKey(oldClient->second.getPublicKey());
+            m_clients[name].setSymmetricKey(oldClient->second.getSymmetricKey());
+        }
     }
 
     displayClientsList();
